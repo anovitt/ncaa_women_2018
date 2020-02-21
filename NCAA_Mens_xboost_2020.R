@@ -225,7 +225,135 @@ names(season_summary_X1) = c("Season", "T1", paste0("X1_",names(season_summary_X
 names(season_summary_X2) = c("Season", "T2", paste0("X2_",names(season_summary_X2)[-c(1,2)]))
 
 
+### Combine all features into a data frame
 
+data_matrix =
+  tourney %>% 
+  left_join(season_summary_X1, by = c("Season", "T1")) %>% 
+  left_join(season_summary_X2, by = c("Season", "T2")) %>%
+  left_join(select(seeds, Season, T1 = TeamID, Seed1 = Seed), by = c("Season", "T1")) %>% 
+  left_join(select(seeds, Season, T2 = TeamID, Seed2 = Seed), by = c("Season", "T2")) %>% 
+  mutate(SeedDiff = Seed1 - Seed2) %>%
+  left_join(select(quality, Season, T1 = Team_Id, quality_march_T1 = quality), by = c("Season", "T1")) %>%
+  left_join(select(quality, Season, T2 = Team_Id, quality_march_T2 = quality), by = c("Season", "T2")) %>%
+  left_join(select(quality2, Season, T1 = Team_Id, quality2_march_T1 = quality), by = c("Season", "T1")) %>%
+  left_join(select(quality2, Season, T2 = Team_Id, quality2_march_T2 = quality), by = c("Season", "T2")) %>%
+  mutate(Location = as.numeric(as.factor(Location)))
+  
+### Prepare xgboost 
+
+str(data_matrix)
+
+features = setdiff(names(data_matrix), c("Season", "DayNum", "T1", "T2", "T1_Points", "T2_Points", "ResultDiff"))
+dtrain = xgb.DMatrix(as.matrix(data_matrix[, features]), label = data_matrix$ResultDiff)
+
+cauchyobj <- function(preds, dtrain) {
+  labels <- getinfo(dtrain, "label")
+  c <- 5000 
+  x <-  preds-labels
+  grad <- x / (x^2/c^2+1)
+  hess <- -c^2*(x^2-c^2)/(x^2+c^2)^2
+  return(list(grad = grad, hess = hess))
+}
+
+xgb_parameters = 
+  list(objective = cauchyobj, 
+       eval_metric = "mae",
+       booster = "gbtree", 
+       eta = 0.02,
+       subsample = 0.35,
+       colsample_bytree = 0.7,
+       num_parallel_tree = 10,
+       min_child_weight = 40,
+       gamma = 10,
+       max_depth = 3)
+
+N = nrow(data_matrix)
+fold5list = c(
+  rep( 1, floor(N/5) ),
+  rep( 2, floor(N/5) ),
+  rep( 3, floor(N/5) ),
+  rep( 4, floor(N/5) ),
+  rep( 5, N - 4*floor(N/5) )
+)
+
+
+### Build cross-validation model, repeated 10-times
+
+iteration_count = c()
+smooth_model = list()
+
+for (i in 1:10) {
+  
+  ### Resample fold split
+  set.seed(i)
+  folds = list()  
+  fold_list = sample(fold5list)
+  for (k in 1:5) folds[[k]] = which(fold_list == k)
+  
+  set.seed(120)
+  xgb_cv = 
+    xgb.cv(
+      params = xgb_parameters,
+      data = dtrain,
+      nrounds = 3000,
+      verbose = 0,
+      nthread = 12,
+      folds = folds,
+      early_stopping_rounds = 25,
+      maximize = FALSE,
+      prediction = TRUE
+    )
+  iteration_count = c(iteration_count, xgb_cv$best_iteration)
+  
+  ### Fit a smoothed GAM model on predicted result point differential to get probabilities
+  smooth_model[[i]] = smooth.spline(x = xgb_cv$pred, y = ifelse(data_matrix$ResultDiff > 0, 1, 0))
+  
+}
+
+
+### Build submission models
+
+submission_model = list()
+
+for (i in 1:10) {
+  set.seed(i)
+  submission_model[[i]] = 
+    xgb.train(
+      params = xgb_parameters,
+      data = dtrain,
+      nrounds = round(iteration_count[i]*1.05),
+      verbose = 0,
+      nthread = 12,
+      maximize = FALSE,
+      prediction = TRUE
+    )
+}
+
+
+### Run predictions
+
+sub$Season = 2018
+sub$T1 = as.numeric(substring(sub$ID,6,9))
+sub$T2 = as.numeric(substring(sub$ID,11,14))
+
+Z = sub %>% 
+  left_join(season_summary_X1, by = c("Season", "T1")) %>% 
+  left_join(season_summary_X2, by = c("Season", "T2")) %>%
+  left_join(select(seeds, Season, T1 = TeamID, Seed1 = Seed), by = c("Season", "T1")) %>% 
+  left_join(select(seeds, Season, T2 = TeamID, Seed2 = Seed), by = c("Season", "T2")) %>% 
+  mutate(SeedDiff = Seed1 - Seed2) %>%
+  left_join(select(quality, Season, T1 = Team_Id, quality_march_T1 = quality), by = c("Season", "T1")) %>%
+  left_join(select(quality, Season, T2 = Team_Id, quality_march_T2 = quality), by = c("Season", "T2"))
+
+dtest = xgb.DMatrix(as.matrix(Z[, features]))
+
+probs = list()
+for (i in 1:10) {
+  preds = predict(submission_model[[i]], dtest)
+  probs[[i]] = predict(smooth_model[[i]], preds)$y
+}
+Z$Pred = Reduce("+", probs) / 10
 
 
 
