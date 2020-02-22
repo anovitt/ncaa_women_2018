@@ -239,6 +239,8 @@ data_matrix =
   left_join(select(quality2, Season, T1 = Team_Id, quality2_march_T1 = quality), by = c("Season", "T1")) %>%
   left_join(select(quality2, Season, T2 = Team_Id, quality2_march_T2 = quality), by = c("Season", "T2")) %>%
   mutate(Location = as.numeric(as.factor(Location)))
+
+data_matrix[is.na(data_matrix)] <- 0
   
 ### Prepare xgboost 
 
@@ -333,7 +335,7 @@ for (i in 1:10) {
 
 ### Run predictions
 
-sub$Season = 2018
+#sub$Season = 2018
 sub$T1 = as.numeric(substring(sub$ID,6,9))
 sub$T2 = as.numeric(substring(sub$ID,11,14))
 
@@ -355,6 +357,20 @@ for (i in 1:10) {
 }
 Z$Pred = Reduce("+", probs) / 10
 
+### Better be safe than sorry
+Z$Pred[Z$Pred <= 0.025] = 0.025
+Z$Pred[Z$Pred >= 0.975] = 0.975
 
+### Anomaly event happened only once before - be brave
+Z$Pred[Z$Seed1 == 16 & Z$Seed2 == 1] = 0
+Z$Pred[Z$Seed1 == 15 & Z$Seed2 == 2] = 0
+Z$Pred[Z$Seed1 == 14 & Z$Seed2 == 3] = 0
+Z$Pred[Z$Seed1 == 13 & Z$Seed2 == 4] = 0
+Z$Pred[Z$Seed1 == 1 & Z$Seed2 == 16] = 1
+Z$Pred[Z$Seed1 == 2 & Z$Seed2 == 15] = 1
+Z$Pred[Z$Seed1 == 3 & Z$Seed2 == 14] = 1
+Z$Pred[Z$Seed1 == 4 & Z$Seed2 == 13] = 1
+
+write.csv(select(Z, ID, Pred), "sub.csv", row.names = FALSE)
 
 
