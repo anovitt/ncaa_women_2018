@@ -2,6 +2,7 @@ library(data.table)
 library(tidyverse)
 library(xgboost)
 library(lme4)
+library(Metrics)
 
 # Load the data
 
@@ -231,22 +232,31 @@ data_matrix =
   tourney %>% 
   left_join(season_summary_X1, by = c("Season", "T1")) %>% 
   left_join(season_summary_X2, by = c("Season", "T2")) %>%
-  left_join(select(seeds, Season, T1 = TeamID, Seed1 = Seed), by = c("Season", "T1")) %>% 
-  left_join(select(seeds, Season, T2 = TeamID, Seed2 = Seed), by = c("Season", "T2")) %>% 
-  mutate(SeedDiff = Seed1 - Seed2) %>%
-  left_join(select(quality, Season, T1 = Team_Id, quality_march_T1 = quality), by = c("Season", "T1")) %>%
-  left_join(select(quality, Season, T2 = Team_Id, quality_march_T2 = quality), by = c("Season", "T2")) %>%
-  left_join(select(quality2, Season, T1 = Team_Id, quality2_march_T1 = quality), by = c("Season", "T1")) %>%
-  left_join(select(quality2, Season, T2 = Team_Id, quality2_march_T2 = quality), by = c("Season", "T2")) %>%
+  left_join(select(seeds, Season, T1 = TeamID, X1_Seed = Seed), by = c("Season", "T1")) %>% 
+  left_join(select(seeds, Season, T2 = TeamID, X2_Seed = Seed), by = c("Season", "T2")) %>% 
+  mutate(X1_SeedDiff = X1_Seed - X2_Seed,
+         X2_SeedDiff = X2_Seed - X1_Seed) %>%
+  left_join(select(quality, Season, T1 = Team_Id, X1_quality_march = quality), by = c("Season", "T1")) %>%
+  left_join(select(quality, Season, T2 = Team_Id, X2_quality_march = quality), by = c("Season", "T2")) %>%
+  #left_join(select(quality2, Season, T1 = Team_Id, X1_quality2_march = quality), by = c("Season", "T1")) %>%
+  #left_join(select(quality2, Season, T2 = Team_Id, X2_quality2_march = quality), by = c("Season", "T2")) %>%
   mutate(Location = as.numeric(as.factor(Location)))
 
 data_matrix[is.na(data_matrix)] <- 0
+
+class(data_matrix)
+
+head(data_matrix)
   
 ### Prepare xgboost 
 
-str(data_matrix)
+write.csv(data_matrix,file='data_matrix.csv',row.names = FALSE)
 
-features = setdiff(names(data_matrix), c("Season", "DayNum", "T1", "T2", "T1_Points", "T2_Points", "ResultDiff"))
+data_matrix <-
+  data_matrix %>%
+  filter(Season < 2015)
+
+features = setdiff(names(data_matrix), c("Season", "DayNum", "T1", "T2", "T1_Points", "T2_Points", "ResultDiff", "Location"))
 dtrain = xgb.DMatrix(as.matrix(data_matrix[, features]), label = data_matrix$ResultDiff)
 
 cauchyobj <- function(preds, dtrain) {
@@ -265,7 +275,7 @@ xgb_parameters =
        eta = 0.02,
        subsample = 0.35,
        colsample_bytree = 0.7,
-       num_parallel_tree = 10,
+       num_parallel_tree = 1,
        min_child_weight = 40,
        gamma = 10,
        max_depth = 3)
@@ -298,7 +308,8 @@ for (i in 1:10) {
     xgb.cv(
       params = xgb_parameters,
       data = dtrain,
-      nrounds = 3000,
+      #nrounds = 3000,
+      nrounds = 300,
       verbose = 0,
       nthread = 12,
       folds = folds,
@@ -320,6 +331,7 @@ submission_model = list()
 
 for (i in 1:10) {
   set.seed(i)
+  print(i)
   submission_model[[i]] = 
     xgb.train(
       params = xgb_parameters,
@@ -336,17 +348,23 @@ for (i in 1:10) {
 ### Run predictions
 
 #sub$Season = 2018
+
+sub$Season = as.numeric(substring(sub$ID,1,4))
 sub$T1 = as.numeric(substring(sub$ID,6,9))
 sub$T2 = as.numeric(substring(sub$ID,11,14))
 
 Z = sub %>% 
   left_join(season_summary_X1, by = c("Season", "T1")) %>% 
   left_join(season_summary_X2, by = c("Season", "T2")) %>%
-  left_join(select(seeds, Season, T1 = TeamID, Seed1 = Seed), by = c("Season", "T1")) %>% 
-  left_join(select(seeds, Season, T2 = TeamID, Seed2 = Seed), by = c("Season", "T2")) %>% 
-  mutate(SeedDiff = Seed1 - Seed2) %>%
-  left_join(select(quality, Season, T1 = Team_Id, quality_march_T1 = quality), by = c("Season", "T1")) %>%
-  left_join(select(quality, Season, T2 = Team_Id, quality_march_T2 = quality), by = c("Season", "T2"))
+  left_join(select(seeds, Season, T1 = TeamID, X1_Seed = Seed), by = c("Season", "T1")) %>% 
+  left_join(select(seeds, Season, T2 = TeamID, X2_Seed = Seed), by = c("Season", "T2")) %>% 
+  mutate(SeedDiff = X1_Seed - X2_Seed,) %>%
+  left_join(select(quality, Season, T1 = Team_Id, X1_quality_march = quality), by = c("Season", "T1")) %>%
+  left_join(select(quality, Season, T2 = Team_Id, X2_quality_march = quality), by = c("Season", "T2")) %>%
+  left_join(select(quality2, Season, T1 = Team_Id, X1_quality2_march = quality), by = c("Season", "T1")) %>%
+  left_join(select(quality2, Season, T2 = Team_Id, X2_quality2_march = quality), by = c("Season", "T2")) 
+
+Z[is.na(Z)] <- 0
 
 dtest = xgb.DMatrix(as.matrix(Z[, features]))
 
@@ -373,4 +391,38 @@ Z$Pred[Z$Seed1 == 4 & Z$Seed2 == 13] = 1
 
 write.csv(select(Z, ID, Pred), "sub.csv", row.names = FALSE)
 
+#############################
+
+# look at model performance
+
+ZZ <-
+Z %>%
+  select(Season,T1,T2,Pred)
+
+test <-
+results %>%
+  filter(Season > 2014) %>%
+  select(Season,WTeamID,LTeamID,WScore,LScore) %>%
+  left_join(ZZ,by = c("Season" = "Season", "WTeamID" = "T1", "LTeamID" = "T2")) %>%
+  left_join(ZZ,by = c("Season" = "Season", "WTeamID" = "T2", "LTeamID" = "T1")) %>%
+  as.data.table()
+
+test$Pred <- rowSums(test[,c("Pred.x", "Pred.y")],na.rm = TRUE)
+
+test <-
+test %>%
+  select(Season,WTeamID,LTeamID,WScore,LScore,Pred)%>%
+  mutate(Act = rep(1,times = nrow(test))) %>%
+  as.data.table()
+  
+test[, logLoss(Act,Pred), by = list(Season)]
+
+# Factor Importance
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[1]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[2]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[3]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[4]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[5]]), top_n = 20)
+         
+logLoss(c(1,1,1,1,1,1),c(0.5,0.5,0.5,0.5,0.5,1))
 
