@@ -10,8 +10,26 @@ regresults <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-202
 results <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MNCAATourneyDetailedResults.csv")
 sub <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MSampleSubmissionStage1_2020.csv")
 seeds <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MNCAATourneySeeds.csv")
+masey <- fread("R/kaggle_mania_2019_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MMasseyOrdinals.csv")
 
 seeds$Seed = as.numeric(substring(seeds$Seed,2,4))
+
+valid_masey = group_by(masey,SystemName) %>% 
+  summarize(nn=min(Season),mm=max(Season), n=n(), nd=n_distinct(TeamID)) %>% 
+  filter(nn==2003,mm==2019)
+
+last_rank = masey %>% 
+  filter(SystemName %in% valid_masey$SystemName, RankingDayNum<=133) %>% 
+  group_by(SystemName,TeamID) %>% 
+  mutate(r=row_number(desc(RankingDayNum)))%>% 
+  filter(r==1) %>% 
+  select(-r,-RankingDayNum)
+
+last_rank
+last_rank = dcast(Season+TeamID~SystemName,data=last_rank,value.var='OrdinalRank')
+
+last_rank_T1 = last_rank; names(last_rank_T1) = paste0('T1_',names(last_rank))
+last_rank_T2 = last_rank; names(last_rank_T2) = paste0('T2_',names(last_rank))
 
 #repeat results twice with switched team positions
 regular_season = 
