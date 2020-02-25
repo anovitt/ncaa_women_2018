@@ -184,6 +184,7 @@ season_summary =
     stl_mean=mean(T1_stl), 
     blk_mean=mean(T1_blk), 
     pf_mean=mean(T1_pf), 
+    fgm3fgm2=sum(T1_fgm3)/sum(T1_fgm), 
     
     fgm_sd=sd(T1_fgm),     
     fga_sd=sd(T1_fga), 
@@ -234,27 +235,23 @@ data_matrix =
   left_join(season_summary_X2, by = c("Season", "T2")) %>%
   left_join(select(seeds, Season, T1 = TeamID, X1_Seed = Seed), by = c("Season", "T1")) %>% 
   left_join(select(seeds, Season, T2 = TeamID, X2_Seed = Seed), by = c("Season", "T2")) %>% 
-  mutate(X1_SeedDiff = X1_Seed - X2_Seed,
-         X2_SeedDiff = X2_Seed - X1_Seed) %>%
+  mutate(SeedDiff = X1_Seed - X2_Seed) %>%
   left_join(select(quality, Season, T1 = Team_Id, X1_quality_march = quality), by = c("Season", "T1")) %>%
-  left_join(select(quality, Season, T2 = Team_Id, X2_quality_march = quality), by = c("Season", "T2")) %>%
+  left_join(select(quality, Season, T2 = Team_Id, X2_quality_march = quality), by = c("Season", "T2")) 
   #left_join(select(quality2, Season, T1 = Team_Id, X1_quality2_march = quality), by = c("Season", "T1")) %>%
   #left_join(select(quality2, Season, T2 = Team_Id, X2_quality2_march = quality), by = c("Season", "T2")) %>%
-  mutate(Location = as.numeric(as.factor(Location)))
+  #mutate(Location = as.numeric(as.factor(Location)))
 
 data_matrix[is.na(data_matrix)] <- 0
 
-class(data_matrix)
 
-head(data_matrix)
-  
 ### Prepare xgboost 
 
 write.csv(data_matrix,file='data_matrix.csv',row.names = FALSE)
 
 data_matrix <-
   data_matrix %>%
-  filter(Season < 2015)
+  filter(Season < 2019)
 
 features = setdiff(names(data_matrix), c("Season", "DayNum", "T1", "T2", "T1_Points", "T2_Points", "ResultDiff", "Location"))
 dtrain = xgb.DMatrix(as.matrix(data_matrix[, features]), label = data_matrix$ResultDiff)
@@ -360,9 +357,9 @@ Z = sub %>%
   left_join(select(seeds, Season, T2 = TeamID, X2_Seed = Seed), by = c("Season", "T2")) %>% 
   mutate(SeedDiff = X1_Seed - X2_Seed,) %>%
   left_join(select(quality, Season, T1 = Team_Id, X1_quality_march = quality), by = c("Season", "T1")) %>%
-  left_join(select(quality, Season, T2 = Team_Id, X2_quality_march = quality), by = c("Season", "T2")) %>%
-  left_join(select(quality2, Season, T1 = Team_Id, X1_quality2_march = quality), by = c("Season", "T1")) %>%
-  left_join(select(quality2, Season, T2 = Team_Id, X2_quality2_march = quality), by = c("Season", "T2")) 
+  left_join(select(quality, Season, T2 = Team_Id, X2_quality_march = quality), by = c("Season", "T2")) 
+  #left_join(select(quality2, Season, T1 = Team_Id, X1_quality2_march = quality), by = c("Season", "T1")) %>%
+  #left_join(select(quality2, Season, T2 = Team_Id, X2_quality2_march = quality), by = c("Season", "T2")) 
 
 Z[is.na(Z)] <- 0
 
@@ -423,6 +420,10 @@ xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submiss
 xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[3]]), top_n = 20)
 xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[4]]), top_n = 20)
 xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[5]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[6]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[7]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[8]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[9]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[10]]), top_n = 20)
          
-logLoss(c(1,1,1,1,1,1),c(0.5,0.5,0.5,0.5,0.5,1))
 
