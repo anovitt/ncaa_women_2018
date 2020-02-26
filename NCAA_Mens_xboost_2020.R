@@ -10,7 +10,7 @@ regresults <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-202
 results <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MNCAATourneyDetailedResults.csv")
 sub <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MSampleSubmissionStage1_2020.csv")
 seeds <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MNCAATourneySeeds.csv")
-masey <- fread("R/kaggle_mania_2019_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MMasseyOrdinals.csv")
+masey <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MMasseyOrdinals.csv")
 
 seeds$Seed = as.numeric(substring(seeds$Seed,2,4))
 
@@ -262,7 +262,39 @@ data_matrix =
 
 data_matrix[is.na(data_matrix)] <- 0
 
+data_matrix = left_join(data_matrix,last_rank_T1,by=c("Season"="T1_Season",'T1'='T1_TeamID'))
+data_matrix = left_join(data_matrix,last_rank_T2,by=c("Season"="T2_Season",'T2'='T2_TeamID'))
 
+data_matrix[is.na(data_matrix)] <- 200
+
+data_matrix <- as.data.table(data_matrix)
+#data_matrix[, T1_25Wins := rep(0,times = nrow(data_matrix))]
+#data_matrix[, T2_25Wins := rep(0,times = nrow(data_matrix))]
+
+top25DT <- 
+data_matrix %>%
+  filter( T1_AP <= 25 | T2_AP <= 25) %>%
+  select(Season,T1,T1_Points,T2,T2_Points,T1_AP,T2_AP) %>%
+  mutate(T1_25Wins= ifelse(T1_Points > T2_Points, 1, 0),
+          T2_25Wins = ifelse(T2_Points > T1_Points,1 , 0)) %>%
+  as.data.table()
+
+top25DT <-
+top25DT %>%
+  group_by(Season, T1) %>%
+  summarise(Wins25 = sum(T1_25Wins)) %>%
+  as.data.table()
+
+temp <- (names(data_matrix))
+
+data_matrix <-
+data_matrix %>%
+  left_join(top25DT, by = c("Season" = "Season", "T1" = "T1")) %>%
+  left_join(top25DT, by = c("Season" = "Season", "T2" = "T1")) 
+
+names(data_matrix) <- c(temp,T1_25Wins,T2_25_Wins)
+    
+  
 ### Prepare xgboost 
 
 write.csv(data_matrix,file='data_matrix.csv',row.names = FALSE)
