@@ -19,18 +19,14 @@ valid_masey = group_by(masey,SystemName) %>%
   filter(nn==2003,mm==2019)
 
 last_rank = masey %>% 
-  filter(SystemName %in% valid_masey$SystemName, RankingDayNum<=133) %>% 
+  filter(SystemName %in% valid_masey$SystemName, RankingDayNum <= 200) %>% 
   group_by(SystemName,TeamID) %>% 
   mutate(r=row_number(desc(RankingDayNum)))%>% 
   filter(r==1) %>% 
-  select(-r,-RankingDayNum)
-
-last_rank
-last_rank = dcast(Season+TeamID~SystemName,data=last_rank,value.var='OrdinalRank')
-
-last_rank[is.na(last_rank)] <- 200
-
-tail(last_rank)
+  select(-r,-RankingDayNum) %>%
+  pivot_wider(names_from = SystemName, values_from = OrdinalRank)%>%
+  select(Season,TeamID,AP)%>%
+  replace_na(list(AP = 200))
 
 last_rank_T1 = last_rank; names(last_rank_T1) = paste0('T1_',names(last_rank))
 last_rank_T2 = last_rank; names(last_rank_T2) = paste0('T2_',names(last_rank))
@@ -298,17 +294,49 @@ data_matrix %>%
   left_join(top25DT, by = c("Season" = "Season", "T1" = "T1")) %>%
   left_join(top25DT, by = c("Season" = "Season", "T2" = "T1")) 
 
-names(data_matrix) <- c(temp,"T1_25Wins","T2_25_Wins")
-    
-data_matrix[is.na(data_matrix)] <- 0  
-### Prepare xgboost 
-## remove this for round 2
+names(data_matrix) <- c(temp,"T1_25Wins","T2_25Wins")
+
+data_matrix <-    
+data_matrix %>% 
+  replace_na(list(T1_25Wins = 0,T2_25Wins = 0)) 
 
 data_matrix <-
-  data_matrix %>%
-  filter(Season < 2019)
+  data_matrix %>% 
+  filter(Season < 2015)
 
 write.csv(data_matrix,file='data_matrix.csv',row.names = FALSE)
 
+#sub$Season = 2018
 
+sub$Season = as.numeric(substring(sub$ID,1,4))
+sub$T1 = as.numeric(substring(sub$ID,6,9))
+sub$T2 = as.numeric(substring(sub$ID,11,14))
 
+Z = sub %>% 
+  left_join(season_summary_X1, by = c("Season", "T1")) %>% 
+  left_join(season_summary_X2, by = c("Season", "T2")) %>%
+  left_join(select(seeds, Season, T1 = TeamID, X1_Seed = Seed), by = c("Season", "T1")) %>% 
+  left_join(select(seeds, Season, T2 = TeamID, X2_Seed = Seed), by = c("Season", "T2")) %>% 
+  mutate(SeedDiff = X1_Seed - X2_Seed,) %>%
+  left_join(select(quality, Season, T1 = Team_Id, X1_quality_march = quality), by = c("Season", "T1")) %>%
+  left_join(select(quality, Season, T2 = Team_Id, X2_quality_march = quality), by = c("Season", "T2")) %>%
+  left_join(last_rank_T1,by=c("Season"="T1_Season",'T1'='T1_TeamID')) %>%
+  left_join(last_rank_T2,by=c("Season"="T2_Season",'T2'='T2_TeamID')) %>%
+  replace_na(list(T1_AP = 200,T2_AP = 200)) 
+temp <- names(Z)
+
+Z <-
+  Z %>%
+  left_join(top25DT, by = c("Season" = "Season", "T1" = "T1")) %>%
+  left_join(top25DT, by = c("Season" = "Season", "T2" = "T1")) 
+
+names(Z) <- c(temp,"T1_25Wins","T2_25Wins")
+Z[is.na(Z)] <- 0
+
+write.csv(Z , file = 'sub_matrix.csv')
+
+write.csv(Z, file = 'C:/Users/tnovi/AppData/Local/Programs/Python/Python36/Scripts/NCAA_March_Madness_2020/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/sub_matrix.csv')
+write.csv(data_matrix, file = 'C:/Users/tnovi/AppData/Local/Programs/Python/Python36/Scripts/NCAA_March_Madness_2020/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/data_matrix.csv')
+
+# run NCAA_Mens_xboost_2020.R
+# run Python nn code
