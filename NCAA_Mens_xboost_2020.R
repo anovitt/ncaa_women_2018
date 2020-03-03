@@ -25,7 +25,7 @@ xgb_parameters =
        eta = 0.02,
        subsample = 0.35,
        colsample_bytree = 0.7,
-       num_parallel_tree = 2,
+       num_parallel_tree = 1,
        min_child_weight = 40,
        gamma = 10,
        max_depth = 3)
@@ -49,6 +49,7 @@ for (i in 1:10) {
   
   ### Resample fold split
   set.seed(i)
+  print(i)
   folds = list()  
   fold_list = sample(fold5list)
   for (k in 1:5) folds[[k]] = which(fold_list == k)
@@ -217,6 +218,7 @@ for (i in 1:10) {
   
   ### Resample fold split
   set.seed(i)
+  print(i)
   folds = list()  
   fold_list = sample(fold5list)
   for (k in 1:5) folds[[k]] = which(fold_list == k)
@@ -227,7 +229,7 @@ for (i in 1:10) {
       params = xgb_parameters,
       data = dtrain,
       #nrounds = 3000,
-      nrounds = 300,
+      nrounds = 1000,
       verbose = 0,
       nthread = 12,
       folds = folds,
@@ -287,7 +289,7 @@ Z$Pred[Z$Seed1 == 2 & Z$Seed2 == 15] = 1
 Z$Pred[Z$Seed1 == 3 & Z$Seed2 == 14] = 1
 Z$Pred[Z$Seed1 == 4 & Z$Seed2 == 13] = 1
 
-write.csv(select(Z, ID, Pred), "sub.csv", row.names = FALSE)
+write.csv(select(Z, ID, Pred), "sub2.csv", row.names = FALSE)
 
 ZZ <-
   Z %>%

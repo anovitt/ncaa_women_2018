@@ -14,6 +14,8 @@ masey <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-div
 
 seeds$Seed = as.numeric(substring(seeds$Seed,2,4))
 
+yearholdout <- 2015  # change this prior to round 2.
+
 valid_masey = group_by(masey,SystemName) %>% 
   summarize(nn=min(Season),mm=max(Season), n=n(), nd=n_distinct(TeamID)) %>% 
   filter(nn==2003,mm==2019)
@@ -302,7 +304,7 @@ data_matrix %>%
 
 data_matrix <-
   data_matrix %>% 
-  filter(Season < 2015)
+  filter(Season < yearholdout)
 
 write.csv(data_matrix,file='data_matrix.csv',row.names = FALSE)
 
