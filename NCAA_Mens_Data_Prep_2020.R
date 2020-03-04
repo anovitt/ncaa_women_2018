@@ -12,7 +12,7 @@ sub <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-divis
 seeds <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MNCAATourneySeeds.csv")
 masey <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MMasseyOrdinals.csv")
 
-seeds$Seed = as.numeric(substring(seeds$Seed,2,4))
+seeds$Seed = as.numeric(substring(seeds$Seed,2,3))
 
 yearholdout <- 2015  # change this prior to round 2.
 
@@ -166,13 +166,13 @@ X =  regular_season %>%
 X$T1 = as.factor(X$T1)
 X$T2 = as.factor(X$T2)
 
-quality2 = list()
-for (season in unique(X$Season)) {
-  glmm = glmer(I(T1_Points > T2_Points) ~  (1 | T1) + (1 | T2), data = X[X$Season == season & X$NumOT == 0, ], family = binomial) 
-  random_effects = ranef(glmm)$T1
-  quality2[[season]] = data.frame(Season = season, Team_Id = as.numeric(row.names(random_effects)), quality = exp(random_effects[,"(Intercept)"]))
-}
-quality2 = do.call(rbind, quality2)
+#quality2 = list()
+#for (season in unique(X$Season)) {
+#  glmm = glmer(I(T1_Points > T2_Points) ~  (1 | T1) + (1 | T2), data = X[X$Season == season & X$NumOT == 0, ], family = binomial) 
+#  random_effects = ranef(glmm)$T1
+#  quality2[[season]] = data.frame(Season = season, Team_Id = as.numeric(row.names(random_effects)), quality = exp(random_effects[,"(Intercept)"]))
+#}
+#quality2 = do.call(rbind, quality2)
 
 ### Regular season statistics
 

@@ -25,7 +25,7 @@ xgb_parameters =
        eta = 0.02,
        subsample = 0.35,
        colsample_bytree = 0.7,
-       num_parallel_tree = 1,
+       num_parallel_tree = 2,
        min_child_weight = 40,
        gamma = 10,
        max_depth = 3)
@@ -107,19 +107,21 @@ for (i in 1:10) {
 }
 Z$Pred = Reduce("+", probs) / 10
 
-### Better be safe than sorry
-Z$Pred[Z$Pred <= 0.025] = 0.025
-Z$Pred[Z$Pred >= 0.975] = 0.975
+Z <- 
+Z %>%
+  mutate(Pred = ifelse(Pred <= 0.025, 0.025, Pred),
+         Pred = ifelse(Pred >= 0.975, 0.975, Pred),
+         Pred = ifelse(X1_Seed == 16 & X2_Seed == 1, 0.001, Pred),
+         Pred = ifelse(X1_Seed == 15 & X2_Seed == 2, 0.001, Pred),
+         #Pred = ifelse(X1_Seed == 14 & X2_Seed == 3, 0.001, Pred),
+         #Pred = ifelse(X1_Seed == 13 & X2_Seed == 4, 0.001, Pred),
+         Pred = ifelse(X1_Seed == 1 & X2_Seed == 16, 0.999, Pred),
+         Pred = ifelse(X1_Seed == 2 & X2_Seed == 15, 0.999, Pred))
+         #Pred = ifelse(X1_Seed == 3 & X2_Seed == 14, 0.999, Pred),
+         #Pred = ifelse(X1_Seed == 4 & X2_Seed == 13, 0.999, Pred),
+         #Pred = ifelse(X1_Seed == 1 & X2_Seed == 8 |X1_Seed == 1 & X2_Seed == 9, 0.999, Pred),
+         #Pred = ifelse(X1_Seed == 8 & X2_Seed == 1 |X1_Seed == 9 & X2_Seed == 1, 0.001, Pred))
 
-### Anomaly event happened only once before - be brave
-Z$Pred[Z$Seed1 == 16 & Z$Seed2 == 1] = 0
-Z$Pred[Z$Seed1 == 15 & Z$Seed2 == 2] = 0
-Z$Pred[Z$Seed1 == 14 & Z$Seed2 == 3] = 0
-Z$Pred[Z$Seed1 == 13 & Z$Seed2 == 4] = 0
-Z$Pred[Z$Seed1 == 1 & Z$Seed2 == 16] = 1
-Z$Pred[Z$Seed1 == 2 & Z$Seed2 == 15] = 1
-Z$Pred[Z$Seed1 == 3 & Z$Seed2 == 14] = 1
-Z$Pred[Z$Seed1 == 4 & Z$Seed2 == 13] = 1
 
 write.csv(select(Z, ID, Pred), "sub.csv", row.names = FALSE)
 
@@ -275,19 +277,20 @@ for (i in 1:10) {
 }
 Z$Pred = Reduce("+", probs) / 10
 
-### Better be safe than sorry
-Z$Pred[Z$Pred <= 0.025] = 0.025
-Z$Pred[Z$Pred >= 0.975] = 0.975
-
-### Anomaly event happened only once before - be brave
-Z$Pred[Z$Seed1 == 16 & Z$Seed2 == 1] = 0
-Z$Pred[Z$Seed1 == 15 & Z$Seed2 == 2] = 0
-Z$Pred[Z$Seed1 == 14 & Z$Seed2 == 3] = 0
-Z$Pred[Z$Seed1 == 13 & Z$Seed2 == 4] = 0
-Z$Pred[Z$Seed1 == 1 & Z$Seed2 == 16] = 1
-Z$Pred[Z$Seed1 == 2 & Z$Seed2 == 15] = 1
-Z$Pred[Z$Seed1 == 3 & Z$Seed2 == 14] = 1
-Z$Pred[Z$Seed1 == 4 & Z$Seed2 == 13] = 1
+Z <- 
+  Z %>%
+  mutate(Pred = ifelse(Pred <= 0.025, 0.025, Pred),
+         Pred = ifelse(Pred >= 0.975, 0.975, Pred),
+         Pred = ifelse(X1_Seed == 16 & X2_Seed == 1, 0.001, Pred),
+         Pred = ifelse(X1_Seed == 15 & X2_Seed == 2, 0.001, Pred),
+         #Pred = ifelse(X1_Seed == 14 & X2_Seed == 3, 0.001, Pred),
+         #Pred = ifelse(X1_Seed == 13 & X2_Seed == 4, 0.001, Pred),
+         Pred = ifelse(X1_Seed == 1 & X2_Seed == 16, 0.999, Pred),
+         Pred = ifelse(X1_Seed == 2 & X2_Seed == 15, 0.999, Pred))
+        #Pred = ifelse(X1_Seed == 3 & X2_Seed == 14, 0.999, Pred),
+        #Pred = ifelse(X1_Seed == 4 & X2_Seed == 13, 0.999, Pred),
+        #Pred = ifelse(X1_Seed == 1 & X2_Seed == 8 |X1_Seed == 1 & X2_Seed == 9, 0.999, Pred),
+        #Pred = ifelse(X1_Seed == 8 & X2_Seed == 1 |X1_Seed == 9 & X2_Seed == 1, 0.001, Pred))
 
 write.csv(select(Z, ID, Pred), "sub2.csv", row.names = FALSE)
 
@@ -326,4 +329,4 @@ xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submiss
 xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[9]]), top_n = 20)
 xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[10]]), top_n = 20)
 
-testRunOne
+testRunOne <- rbind(testRunOne,testRunTwo)

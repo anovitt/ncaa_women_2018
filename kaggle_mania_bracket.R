@@ -3,28 +3,15 @@ library(data.table)
 
 #Change this to your submission file.
 ###############################################################
-submission<-read.csv("sub.csv")
+submission<-read.csv("nnsub.csv")
 head(submission)
+
 
 teams<-fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1//MTeams.csv")
 teams<-teams[,1:2]
 
 seeds <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MNCAATourneySeeds.csv")
-
-###############################################################
-#Seeds will probably need to be updated when Jeff gets out the new
-#seedings on Sunday or Monday.
-###############################################################
-#seeds<-read.csv("tourney_seeds_2015_prelim.csv")
-#seeds<-fread("R/kaggle_mania_2019_Men/DataFilesStage2/NCAATourneySeeds.csv")
-#colnames(seeds) <- c("season","Seed","TeamID")
 seeds<-seeds[Season == 2019,]
-
-
-
-
-
-
 
 pdf("seedbracket.pdf",width=11,height=8.5)
 tgtseason<-"2019"
