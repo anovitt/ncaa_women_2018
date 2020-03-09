@@ -11,10 +11,11 @@ results <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-d
 sub <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MSampleSubmissionStage1_2020.csv")
 seeds <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MNCAATourneySeeds.csv")
 masey <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MMasseyOrdinals.csv")
+kpom <- fread("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/NCAA2020_Kenpom.csv")
 
 seeds$Seed = as.numeric(substring(seeds$Seed,2,3))
 
-yearholdout <- 2015  # change this prior to round 2.
+yearholdout <- 2015  # change this for round 2.
 
 valid_masey = group_by(masey,SystemName) %>% 
   summarize(nn=min(Season),mm=max(Season), n=n(), nd=n_distinct(TeamID)) %>% 
@@ -161,10 +162,10 @@ quality = do.call(rbind, quality)
 
 ### Fit GLMM on regular season data (all teams all games) - extract random effects for each team
 
-X =  regular_season %>% 
-  select(Season, T1, T2, T1_Points, T2_Points, NumOT) %>% distinct()
-X$T1 = as.factor(X$T1)
-X$T2 = as.factor(X$T2)
+#X =  regular_season %>% 
+#select(Season, T1, T2, T1_Points, T2_Points, NumOT) %>% distinct()
+#X$T1 = as.factor(X$T1)
+#X$T2 = as.factor(X$T2)
 
 #quality2 = list()
 #for (season in unique(X$Season)) {
@@ -248,6 +249,23 @@ season_summary_X2 = season_summary
 names(season_summary_X1) = c("Season", "T1", paste0("X1_",names(season_summary_X1)[-c(1,2)]))
 names(season_summary_X2) = c("Season", "T2", paste0("X2_",names(season_summary_X2)[-c(1,2)]))
 
+# prep kpom data 
+
+kpom_X1 <- 
+kpom %>%
+  select(setdiff(names(kpom),c('TeamName','FirstD1Season','LastD1Season','record','Seed','rank','team','conference','ncaa_seed',
+                               'adj_o_rank','adj_d_rank','adj_tempo_rank','luck_rank','sos_adj_em_rank','sos_adj_o_rank',
+                               'nc_sos_adj_em_rank'))) 
+
+kpom_X2 <- 
+  kpom %>%
+  select(setdiff(names(kpom),c('TeamName','FirstD1Season','LastD1Season','record','Seed','rank','team','conference','ncaa_seed',
+                               'adj_o_rank','adj_d_rank','adj_tempo_rank','luck_rank','sos_adj_em_rank','sos_adj_o_rank',
+                               'nc_sos_adj_em_rank'))) 
+  
+names(kpom_X1) = c("Season", "T1", paste0("X1_",names(kpom_X1)[-c(1,2)]))
+names(kpom_X2) = c("Season", "T2", paste0("X2_",names(kpom_X2)[-c(1,2)]))  
+
 
 ### Combine all features into a data frame
 
@@ -259,7 +277,9 @@ data_matrix =
   left_join(select(seeds, Season, T2 = TeamID, X2_Seed = Seed), by = c("Season", "T2")) %>% 
   mutate(SeedDiff = X1_Seed - X2_Seed) %>%
   left_join(select(quality, Season, T1 = Team_Id, X1_quality_march = quality), by = c("Season", "T1")) %>%
-  left_join(select(quality, Season, T2 = Team_Id, X2_quality_march = quality), by = c("Season", "T2")) 
+  left_join(select(quality, Season, T2 = Team_Id, X2_quality_march = quality), by = c("Season", "T2")) %>%
+  left_join(kpom_X1, by = c("Season","T1")) %>%
+  left_join(kpom_X2, by = c("Season","T2"))
   #left_join(select(quality2, Season, T1 = Team_Id, X1_quality2_march = quality), by = c("Season", "T1")) %>%
   #left_join(select(quality2, Season, T2 = Team_Id, X2_quality2_march = quality), by = c("Season", "T2")) %>%
   #mutate(Location = as.numeric(as.factor(Location)))
@@ -322,6 +342,8 @@ Z = sub %>%
   mutate(SeedDiff = X1_Seed - X2_Seed,) %>%
   left_join(select(quality, Season, T1 = Team_Id, X1_quality_march = quality), by = c("Season", "T1")) %>%
   left_join(select(quality, Season, T2 = Team_Id, X2_quality_march = quality), by = c("Season", "T2")) %>%
+  left_join(kpom_X1, by = c("Season","T1")) %>%
+  left_join(kpom_X2, by = c("Season","T2")) %>%
   left_join(last_rank_T1,by=c("Season"="T1_Season",'T1'='T1_TeamID')) %>%
   left_join(last_rank_T2,by=c("Season"="T2_Season",'T2'='T2_TeamID')) %>%
   replace_na(list(T1_AP = 200,T2_AP = 200)) 

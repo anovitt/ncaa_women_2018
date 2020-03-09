@@ -1,6 +1,7 @@
 library(dplyr)
 library(xgboost)
 library(lme4)
+library(Metrics)
 
 regresults <- read.csv("data/WRegularSeasonDetailedResults_PrelimData2018.csv")
 results <- read.csv("data/WNCAATourneyDetailedResults_PrelimData2018.csv")
@@ -8,6 +9,15 @@ sub <- read.csv("data/WSampleSubmissionStage2.csv")
 seeds <- read.csv("data/WNCAATourneySeeds.csv")
 
 seeds$Seed = as.numeric(substring(seeds$Seed,2,4))
+
+
+regresults <- read.csv("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MRegularSeasonDetailedResults.csv")
+results <- read.csv("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MNCAATourneyDetailedResults.csv")
+sub <- read.csv("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MSampleSubmissionStage1_2020.csv")
+seeds <- read.csv("R/kaggle_mania_2020_Men/google-cloud-ncaa-march-madness-2020-division-1-mens-tournament/MDataFiles_Stage1/MNCAATourneySeeds.csv")
+
+seeds$Seed = as.numeric(substring(seeds$Seed,2,4))
+
 
 
 ### Collect regular season results - double the data by swapping team positions
@@ -133,6 +143,7 @@ for (i in 1:10) {
   
   ### Resample fold split
   set.seed(i)
+  print(i)
   folds = list()  
   fold_list = sample(fold5list)
   for (k in 1:5) folds[[k]] = which(fold_list == k)
@@ -142,7 +153,8 @@ for (i in 1:10) {
     xgb.cv(
       params = xgb_parameters,
       data = dtrain,
-      nrounds = 3000,
+      #nrounds = 3000,
+      nrounds = 500,
       verbose = 0,
       nthread = 12,
       folds = folds,
@@ -179,7 +191,8 @@ for (i in 1:10) {
 
 ### Run predictions
 
-sub$Season = 2018
+#sub$Season = 2018
+sub$Season = as.numeric(substring(sub$ID,1,4))
 sub$T1 = as.numeric(substring(sub$ID,6,9))
 sub$T2 = as.numeric(substring(sub$ID,11,14))
 
@@ -205,6 +218,8 @@ Z$Pred = Reduce("+", probs) / 10
 Z$Pred[Z$Pred <= 0.025] = 0.025
 Z$Pred[Z$Pred >= 0.975] = 0.975
 
+min(Z$Pred)
+
 ### Anomaly event happened only once before - be brave
 Z$Pred[Z$Seed1 == 16 & Z$Seed2 == 1] = 0
 Z$Pred[Z$Seed1 == 15 & Z$Seed2 == 2] = 0
@@ -216,4 +231,45 @@ Z$Pred[Z$Seed1 == 3 & Z$Seed2 == 14] = 1
 Z$Pred[Z$Seed1 == 4 & Z$Seed2 == 13] = 1
 
 write.csv(select(Z, ID, Pred), "sub.csv", row.names = FALSE)
+
+ZZ <-
+  Z %>%
+  select(Season,T1,T2,Pred)
+
+
+
+test <-
+  results %>%
+  filter(Season > 2014) %>%
+  select(Season,WTeamID,LTeamID,WScore,LScore) %>%
+  left_join(ZZ,by = c("Season" = "Season", "WTeamID" = "T1", "LTeamID" = "T2")) %>%
+  left_join(ZZ,by = c("Season" = "Season", "WTeamID" = "T2", "LTeamID" = "T1")) %>%
+  as.data.table()
+
+test$Pred <- rowSums(test[,c("Pred.x", "Pred.y")],na.rm = TRUE)
+test$Act <- rep(1,times = nrow(test))
+test$Pred <- ifelse(test$Pred == 0, test$Pred +.0001,test$Pred)
+
+
+
+test[, logLoss(Act,Pred), by = list(Season)]
+
+test %>%
+  mutate(ll(Act,Pred))
+  group_by(Season) %>%
+  summarise( LL = logLoss(Act,Pred))
+
+
+
+# Factor Importance
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[1]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[2]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[3]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[4]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[5]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[6]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[7]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[8]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[9]]), top_n = 20)
+xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submission_model[[10]]), top_n = 20)
 

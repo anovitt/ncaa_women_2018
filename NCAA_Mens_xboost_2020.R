@@ -169,7 +169,7 @@ xgb.plot.importance(importance_matrix = xgb.importance(colnames(dtrain), submiss
          
 featTot <- c()
 for(i in 1:10){
-  feat <-xgb.importance(model = submission_model[[i]])[1:40,]$Feature
+  feat <-xgb.importance(model = submission_model[[i]])[1:50,]$Feature
   featTot <- c(featTot,feat)
 }
 
