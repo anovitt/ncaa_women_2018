@@ -4,20 +4,11 @@
 ### Adapted from: https://github.com/lbenz730/NCAA_Hoops_Play_By_Play/blob/master/kenpom_scraper.R
 
 library(XML)
-library(RCurl) ;options(RCurlOptions = 
-                          list(cainfo=system.file("CurlSSL", 
-                                                  "cacert.pem", 
-                                                  package = "RCurl")))
+library(RCurl)
 library(dplyr)
 library(data.table)
 
-options(RCurlOptions = 
-          list(cainfo=system.file("CurlSSL", 
-                                  "cacert.pem", 
-                                  package = "RCurl")))
 years <- 2002:2020
-
-year <- 2020
 
 for(year in years) {
   cat("Getting", year,"\n")
@@ -123,19 +114,3 @@ teamKenpom[Season>=2002 & is.na(Seed),.(TeamName,Season)]
 
 #write out file
 fwrite(teamKenpom[Season>=2002,],"NCAA2020_Kenpom.csv")
-
-
-
-
-
-
-doc <- "http://www.nber.org/cycles/cyclesmain.html"
-# The  main table is the second one because it's embedded in the page table.
-tables <- getNodeSet(htmlParse(doc), "//table")
-xt <- readHTMLTable(tables[[2]],
-                    header = c("peak","trough","contraction",
-                               "expansion","trough2trough","peak2peak"),
-                    colClasses = c("character","character","character",
-                                   "character","character","character"),
-                    trim = TRUE, stringsAsFactors = FALSE
-)

@@ -19,6 +19,9 @@ tgtseason<-"2019"
 seeds$region<-substr(seeds$Seed,1,1)
 seeds$seed<-as.numeric(substr(seeds$Seed,2,3))
 
+
+
+
 submission$season<-substr(submission[,1],1,4)
 submission$team<-as.numeric(substr(submission[,1],6,9))
 
